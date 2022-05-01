@@ -1,9 +1,22 @@
-import ftplib
+from email import encoders
+from email.message import EmailMessage
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
 import stripe
 import pdfkit
-from html.parser import HTMLParser
 from datetime import datetime as d
+from ftplib import FTP
+import smtplib
 
+SENDER = "m122osmanaj@gmail.com"
+PASSWORD = "M122TestPW"
+
+host = "ftp.byethost14.com"
+username = "b14_31622177"
+password = "neural123"
+    
 CustomerId = ""
 city = ""
 zip = ""
@@ -57,6 +70,34 @@ def createPDF(data):
     pdfkit.from_string(html, r'documentation\Payment.pdf', configuration=config)
 
 
+def send_email(recipient, subject, body):
+
+    filename = r'documentation\Payment.pdf'
+    msg = MIMEMultipart("alternative")
+    part = MIMEText(body, 'html')
+    msg.attach(part)
+    #msg.add_attachment(file_data, maintype='application', subtype='octet-stream', filename='Receipt.pdf')
+
+    with open(filename, "rb") as attachment:
+        part = MIMEBase("application", "octet-stream")
+        part.set_payload(attachment.read())
+
+    encoders.encode_base64(part)
+
+    part.add_header(
+        "Content-Disposition",
+        "attachment", filename=filename
+    )
+    msg.attach(part)
+
+    msg["Subject"] = subject
+    msg["From"] = SENDER
+    msg["To"] = recipient
+    server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+    server.login(SENDER, PASSWORD)
+    server.send_message(msg)
+    server.quit()
+
 if __name__ == '__main__':
     stripe.api_key = "sk_test_51KiDANElM3dtUv2KoZ7ttJQNgVlkOYDQnlVnl4etIKaEo0PEZFzIgT8znwHgrmAzj3VSJIDa64Uu1WbobPOcZFAb00Yzh1InKZ"
 
@@ -106,6 +147,33 @@ if __name__ == '__main__':
 
     createPDF(stripe.PaymentIntent.retrieve("pi_3KnIjZElM3dtUv2K1qsvQn2j"))
 
+    with FTP(host) as ftp:
+        ftp.login(user=username, passwd=password)
+        print(ftp.getwelcome())
+
+        with open(r'documentation\Payment.pdf', 'rb') as f:
+            ftp.storbinary('STOR ' + r'Payment.pdf', f)
+
+    email_html = """
+    <html>
+      <head></head>
+      <body>
+        <p>
+            Sehr geehrte/r """ + stripe.Customer.retrieve(CustomerId)["name"] + """<br>
+            <br>
+            Vielen Dank für Ihre Bestellung in unserem E-Shop.<br>
+            Im Anhang erhalten Sie mit dieser Mail, eine Rechnung.<br>
+            Ihre Bestellung ist zurzeit in bearbeitung, Sie können diese jederzeit unter folgendem <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ>Link</a> verfolgen.<br>
+            <br>
+            Mit freundlichen Grüssen<br>
+            <br>
+            Ihr E-Shop, Sheemo
+        </p>
+      </body>
+    </html>
+    """
+
+    send_email("osmanaj.noel0@gmail.com", subject="Vielen Dank für Ihre Bestellung!", body=email_html)
 
 
     stripe.Customer.delete(Customer["id"])
